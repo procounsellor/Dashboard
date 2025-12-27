@@ -1,68 +1,70 @@
-async function fetchUsers() {
-    const date = document.getElementById("dateInput").value;
-    if (!date) return alert("Please select a date!");
+const COURSE_ID = "a997f3a9-4a36-4395-9f90-847b739fb225";  // GuruCool Crash Course
 
-    const loader = document.getElementById("loader");
-    loader.classList.remove("hidden");
+function fetchEnrollments() {
+  const startDate = document.getElementById("startDate").value;
+  const endDate = document.getElementById("endDate").value;
+  const startTime = document.getElementById("startTime").value;
+  const endTime = document.getElementById("endTime").value;
 
-    const tableBody = document.querySelector("#usersTable tbody");
-    tableBody.innerHTML = "";
-    document.getElementById("message").innerText = "";
+  if (!startDate || !endDate || !startTime || !endTime) {
+    alert("Please select all date and time fields");
+    return;
+  }
 
-    try {
-        const response = await fetch(
-            `https://procounsellor-backend-1000407154647.asia-south1.run.app/api/dashboard/filterUsersByDate?date=${date}`,
-            {
-                headers: {
-                    "Accept": "application/json"
-                }
-            }
-        );
+fetch("https://procounsellor-backend-1000407154647.asia-south1.run.app/api/dashboard/getCourseEnrollment", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  body: JSON.stringify({
+    courseId: COURSE_ID,
+    startDate,
+    endDate,
+    startTime,
+    endTime
+  })
+})
+.then(async res => {
+  const text = await res.text();   // read raw response first
 
-        const data = await response.json();
-        loader.classList.add("hidden");
+  if (!res.ok) {
+    console.error("Server error:", text);
+    throw new Error("Server returned error");
+  }
 
-        const users = data?.users || [];
-        const count = data?.count || 0;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Invalid JSON:", text);
+    throw new Error("Invalid JSON response from server");
+  }
+})
+.then(data => {
+  const table = document.getElementById("resultTable");
+  table.innerHTML = "";
 
-        document.getElementById("userCount").innerText = count;
+  if (!data.enrollments || data.enrollments.length === 0) {
+    table.innerHTML = "<tr><td colspan='2'>No enrollments found</td></tr>";
+    return;
+  }
 
-        if (users.length === 0) {
-            document.getElementById("message").innerText = "No users found for this date.";
-            return;
-        }
+  data.enrollments.forEach(e => {
+    const enrolledAt = e.enrolledAt
+      ? new Date(e.enrolledAt.seconds * 1000).toLocaleString()
+      : "N/A";
 
-        users.forEach(u => {
-            const timestamp = u?.dateCreated;
-            let formattedDate = "N/A";
-
-            if (timestamp && timestamp.seconds) {
-                const d = new Date(timestamp.seconds * 1000);
-                formattedDate = d.toLocaleString("en-IN", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit"
-                });
-            }
-
-            const row = `
-                <tr>
-                    <td>${u?.userId || "N/A"}</td>
-                    <td>${(u?.firstName || "") + " " + (u?.lastName || "")}</td>
-                    <td>${u?.city || "N/A"}</td>
-                    <td>${formattedDate}</td>
-                </tr>
-            `;
-
-            tableBody.innerHTML += row;
-        });
-
-    } catch (err) {
-        loader.classList.add("hidden");
-        console.error(err);
-        alert("Something went wrong! Check console logs.");
-    }
+    const row = `
+      <tr>
+        <td>${e.userId}</td>
+        <td>${enrolledAt}</td>
+      </tr>
+    `;
+    table.innerHTML += row;
+  });
+})
+.catch(err => {
+  alert("Failed to fetch enrollments. Check console for details.");
+  console.error(err);
+});
 }
